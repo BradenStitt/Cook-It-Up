@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  password     String
+  name         String
+  pantries     Pantry[]
+  preferences  FoodPreference[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+}
+
+model Pantry {
+  id        Int       @id @default(autoincrement())
+  name      String
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  items     PantryItem[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model PantryItem {
+  id        Int       @id @default(autoincrement())
+  name      String
+  quantity  Int
+  expiryDate DateTime?
+  pantryId  Int
+  pantry    Pantry    @relation(fields: [pantryId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model FoodPreference {
+  id        Int       @id @default(autoincrement())
+  name      String
+  type      String
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
