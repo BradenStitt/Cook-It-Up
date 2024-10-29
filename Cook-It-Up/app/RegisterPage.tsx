@@ -29,7 +29,7 @@ const RegisterPage: React.FC = () => {
 
     try {
       // Insert user into the Supabase table
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("User")
         .insert([{ email, name, password }]);
 
@@ -37,8 +37,18 @@ const RegisterPage: React.FC = () => {
         throw error;
       }
 
+      const { data } = await supabase
+        .from("User")
+        .select("*")
+        .eq("email", email)
+        .eq("password", password);
+
       Alert.alert("Success", "User registered successfully!");
-      navigation.navigate("CreateScreen");
+      if (data) {
+        navigation.navigate("CreateScreen", { userId: data[0].id }); // Pass userId to the next screen
+      } else {
+        throw new Error("User registration failed, no data returned.");
+      }
     } catch (error) {
       Alert.alert("Error", (error as any).message);
     }

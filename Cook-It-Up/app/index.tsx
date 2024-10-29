@@ -46,7 +46,7 @@ const LandingPage: React.FC = () => {
     }
 
     try {
-      // Check if the email and password match
+      // Sign in the user
       const { data, error } = await supabase
         .from("User")
         .select("*")
@@ -57,9 +57,9 @@ const LandingPage: React.FC = () => {
         throw error;
       }
 
-      if (data.length > 0) {
+      if (data) {
         Alert.alert("Success", "Login successful!");
-        navigation.navigate("CreateScreen"); // Navigate to CreateScreen
+        navigation.navigate("CreateScreen", { userId: data[0].id }); // Pass userId to the next screen
       } else {
         Alert.alert("Error", "Invalid email or password");
       }
