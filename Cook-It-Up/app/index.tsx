@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,28 +6,87 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  Alert,
+  FlatList,
 } from "react-native";
+import { supabase } from "../lib/supabase"; // Adjust the path as needed
 
 const LandingPage: React.FC = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase.from("User").select("*");
+      if (error) {
+        throw error;
+      }
+      setUsers(data);
+    } catch (error) {
+      Alert.alert("Error", (error as any).message);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email || !password || !name) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    try {
+      // Insert user into the Supabase table
+      const { data, error } = await supabase
+        .from("User")
+        .insert([{ email, name, password }]);
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert("Success", "User created successfully!");
+      fetchUsers(); // Refresh the user list
+    } catch (error) {
+      Alert.alert("Error", (error as any).message);
+    }
+};
+
   return (
     <View style={styles.container}>
       {/* Header Title */}
       <Text style={styles.header}>Cook It Up!</Text>
 
       <View style={styles.box}>
-        {/* Username and Password Inputs */}
+        {/* Name Input */}
         <TextInput
-          placeholder="Phone number, username, or email"
+          placeholder="Name"
+          value={name}
+          onChangeText={setName}
           style={styles.input}
         />
+        {/* Email Input */}
+        <TextInput
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+        />
+        {/* Password Input */}
         <TextInput
           placeholder="Password"
           secureTextEntry
+          value={password}
+          onChangeText={setPassword}
           style={styles.input}
         />
 
         {/* Login Button */}
-        <TouchableOpacity style={styles.loginButton}>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginButtonText}>Log in</Text>
         </TouchableOpacity>
 
@@ -59,6 +118,18 @@ const LandingPage: React.FC = () => {
           />
         </View>
       </View>
+
+      {/* Display Users */}
+      <FlatList
+        data={users}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.userContainer}>
+            <Text style={styles.userText}>{item.name}</Text>
+            <Text style={styles.userText}>{item.email}</Text>
+          </View>
+        )}
+      />
     </View>
   );
 };
@@ -150,6 +221,14 @@ const styles = StyleSheet.create({
     width: 120,
     height: 40,
     resizeMode: "contain",
+  },
+  userContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  userText: {
+    fontSize: 16,
   },
 });
 
