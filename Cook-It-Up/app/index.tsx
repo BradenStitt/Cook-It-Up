@@ -9,9 +9,15 @@ import {
   Alert,
   FlatList,
 } from "react-native";
+import {
+  useNavigation,
+  NavigationProp,
+  ParamListBase,
+} from "@react-navigation/native";
 import { supabase } from "../lib/supabase"; // Adjust the path as needed
 
 const LandingPage: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -54,7 +60,7 @@ const LandingPage: React.FC = () => {
     } catch (error) {
       Alert.alert("Error", (error as any).message);
     }
-};
+  };
 
   return (
     <View style={styles.container}>
@@ -101,7 +107,7 @@ const LandingPage: React.FC = () => {
         {/* Signup Container */}
         <View style={styles.signupContainer}>
           <Text>Don't have an account?</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("RegisterPage")}>
             <Text style={styles.signupText}>Sign up</Text>
           </TouchableOpacity>
         </View>
