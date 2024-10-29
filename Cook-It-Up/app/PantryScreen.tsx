@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   TextInput,
@@ -8,10 +8,15 @@ import {
   Modal,
   Alert,
   DeviceEventEmitter,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+} from "react-native";
+import { Picker } from "@react-native-picker/picker";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import {
+  NavigationProp,
+  ParamListBase,
+  useNavigation,
+} from "@react-navigation/native";
 
 interface FoodItem {
   id: number;
@@ -29,32 +34,36 @@ declare global {
 }
 
 // Declare foodTypes and units before using them
-const foodTypes = ['Dairy', 'Fruits', 'Vegetables', 'Protein', 'Grains'];
-const units = ['oz', 'g', 'lbs', 'kg'];
+const foodTypes = ["Dairy", "Fruits", "Vegetables", "Protein", "Grains"];
+const units = ["oz", "g", "lbs", "kg"];
 
-export default function PantryScreen({ navigation }: any) {
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(global.foodItems || []);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('All');
+export default function PantryScreen() {
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+
+  const [foodItems, setFoodItems] = useState<FoodItem[]>(
+    global.foodItems || []
+  );
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedType, setSelectedType] = useState<string>("All");
   const [modalVisible, setModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<number | null>(null);
-  const [newItem, setNewItem] = useState<string>('');
-  const [totalQuantity, setTotalQuantity] = useState<number | ''>('');
-  const [weightPerItem, setWeightPerItem] = useState<number | ''>('');
+  const [newItem, setNewItem] = useState<string>("");
+  const [totalQuantity, setTotalQuantity] = useState<number | "">("");
+  const [weightPerItem, setWeightPerItem] = useState<number | "">("");
   const [selectedUnit, setSelectedUnit] = useState<string>(units[0]);
   const [foodType, setFoodType] = useState<string>(foodTypes[0]);
   const [addExpiration, setAddExpiration] = useState<boolean>(false);
-  const [expirationDate, setExpirationDate] = useState<string>('');
+  const [expirationDate, setExpirationDate] = useState<string>("");
 
   useEffect(() => {
     // Update global foodItems and emit event whenever foodItems change
     global.foodItems = foodItems;
-    DeviceEventEmitter.emit('foodItemsUpdated', foodItems);
+    DeviceEventEmitter.emit("foodItemsUpdated", foodItems);
   }, [foodItems]);
 
   const addFoodItem = () => {
-    if (newItem.trim() && totalQuantity !== '' && weightPerItem !== '') {
+    if (newItem.trim() && totalQuantity !== "" && weightPerItem !== "") {
       const itemData: FoodItem = {
         id: Date.now(), // Use timestamp for unique ID
         name: newItem.trim(),
@@ -68,7 +77,7 @@ export default function PantryScreen({ navigation }: any) {
       resetInputs();
       setModalVisible(false);
     } else {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert("Error", "Please fill in all fields.");
     }
   };
 
@@ -76,10 +85,10 @@ export default function PantryScreen({ navigation }: any) {
     if (
       currentItemId !== null &&
       newItem.trim() &&
-      totalQuantity !== '' &&
-      weightPerItem !== ''
+      totalQuantity !== "" &&
+      weightPerItem !== ""
     ) {
-      const updatedItems = foodItems.map(item => {
+      const updatedItems = foodItems.map((item) => {
         if (item.id === currentItemId) {
           return {
             ...item,
@@ -97,40 +106,40 @@ export default function PantryScreen({ navigation }: any) {
       resetInputs();
       setModalVisible(false);
     } else {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert("Error", "Please fill in all fields.");
     }
   };
 
   const resetInputs = () => {
-    setNewItem('');
-    setTotalQuantity('');
-    setWeightPerItem('');
+    setNewItem("");
+    setTotalQuantity("");
+    setWeightPerItem("");
     setSelectedUnit(units[0]);
     setFoodType(foodTypes[0]);
     setAddExpiration(false);
-    setExpirationDate('');
+    setExpirationDate("");
     setCurrentItemId(null);
     setIsEditing(false);
   };
 
   const confirmDelete = (id: number) => {
-    Alert.alert('Delete Item', 'Are you sure you want to delete this item?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'OK', onPress: () => deleteItem(id) },
+    Alert.alert("Delete Item", "Are you sure you want to delete this item?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "OK", onPress: () => deleteItem(id) },
     ]);
   };
 
   const deleteItem = (id: number) => {
-    setFoodItems(prevItems => prevItems.filter(item => item.id !== id));
+    setFoodItems((prevItems) => prevItems.filter((item) => item.id !== id));
   };
 
   const renderItem = ({ item }: { item: FoodItem }) => {
     return (
       <View style={styles.itemContainer}>
         <ThemedText style={styles.itemText}>
-          {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit}{' '}
-          each) - {item.type}{' '}
-          {item.expirationDate ? `- Exp: ${item.expirationDate}` : ''}
+          {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit}{" "}
+          each) - {item.type}{" "}
+          {item.expirationDate ? `- Exp: ${item.expirationDate}` : ""}
         </ThemedText>
         <View style={styles.buttonContainer}>
           <Button
@@ -154,7 +163,7 @@ export default function PantryScreen({ navigation }: any) {
     setWeightPerItem(item.weightPerItem);
     setSelectedUnit(item.unit);
     setFoodType(item.type);
-    setExpirationDate(item.expirationDate || '');
+    setExpirationDate(item.expirationDate || "");
     setAddExpiration(!!item.expirationDate);
     setCurrentItemId(item.id);
     setIsEditing(true);
@@ -162,20 +171,20 @@ export default function PantryScreen({ navigation }: any) {
   };
 
   const handleTotalQuantityChange = (text: string) => {
-    if (text === '') {
-      setTotalQuantity('');
+    if (text === "") {
+      setTotalQuantity("");
     } else {
       const numericValue = parseFloat(text);
-      setTotalQuantity(isNaN(numericValue) ? '' : numericValue);
+      setTotalQuantity(isNaN(numericValue) ? "" : numericValue);
     }
   };
 
   const handleWeightPerItemChange = (text: string) => {
-    if (text === '') {
-      setWeightPerItem('');
+    if (text === "") {
+      setWeightPerItem("");
     } else {
       const numericValue = parseFloat(text);
-      setWeightPerItem(isNaN(numericValue) ? '' : numericValue);
+      setWeightPerItem(isNaN(numericValue) ? "" : numericValue);
     }
   };
 
@@ -196,17 +205,17 @@ export default function PantryScreen({ navigation }: any) {
         onValueChange={(itemValue: string) => setSelectedType(itemValue)}
       >
         <Picker.Item label="All" value="All" />
-        {foodTypes.map(type => (
+        {foodTypes.map((type) => (
           <Picker.Item key={type} label={type} value={type} />
         ))}
       </Picker>
       <FlatList
         data={foodItems.filter(
-          item =>
+          (item) =>
             item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            (selectedType === 'All' || item.type === selectedType),
+            (selectedType === "All" || item.type === selectedType)
         )}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         style={styles.list}
       />
@@ -220,14 +229,14 @@ export default function PantryScreen({ navigation }: any) {
       />
       <Button
         title="Go to Create"
-        onPress={() => navigation.navigate('Create')}
+        onPress={() => navigation.navigate("CreateScreen")}
         color="#007bff"
       />
       <Modal transparent={true} visible={modalVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <ThemedText type="title" style={styles.modalTitle}>
-              {isEditing ? 'Edit Item' : 'Add Item'}
+              {isEditing ? "Edit Item" : "Add Item"}
             </ThemedText>
             <TextInput
               style={styles.modalInput}
@@ -240,20 +249,20 @@ export default function PantryScreen({ navigation }: any) {
               style={styles.modalPicker}
               onValueChange={(itemValue: string) => setFoodType(itemValue)}
             >
-              {foodTypes.map(type => (
+              {foodTypes.map((type) => (
                 <Picker.Item key={type} label={type} value={type} />
               ))}
             </Picker>
             <TextInput
               style={styles.modalInput}
-              value={totalQuantity === '' ? '' : String(totalQuantity)}
+              value={totalQuantity === "" ? "" : String(totalQuantity)}
               onChangeText={handleTotalQuantityChange}
               placeholder="Total Quantity"
               keyboardType="numeric"
             />
             <TextInput
               style={styles.modalInput}
-              value={weightPerItem === '' ? '' : String(weightPerItem)}
+              value={weightPerItem === "" ? "" : String(weightPerItem)}
               onChangeText={handleWeightPerItemChange}
               placeholder="Weight per Item"
               keyboardType="numeric"
@@ -263,16 +272,16 @@ export default function PantryScreen({ navigation }: any) {
               style={styles.modalPicker}
               onValueChange={(itemValue: string) => setSelectedUnit(itemValue)}
             >
-              {units.map(unit => (
+              {units.map((unit) => (
                 <Picker.Item key={unit} label={unit} value={unit} />
               ))}
             </Picker>
             <ThemedText>Do you want to add an expiration date?</ThemedText>
             <Picker
-              selectedValue={addExpiration ? 'Yes' : 'No'}
+              selectedValue={addExpiration ? "Yes" : "No"}
               style={styles.modalPicker}
               onValueChange={(value: string) =>
-                setAddExpiration(value === 'Yes')
+                setAddExpiration(value === "Yes")
               }
             >
               <Picker.Item label="Yes" value="Yes" />
@@ -287,7 +296,7 @@ export default function PantryScreen({ navigation }: any) {
               />
             )}
             <Button
-              title={isEditing ? 'Update' : 'Add'}
+              title={isEditing ? "Update" : "Add"}
               onPress={isEditing ? editFoodItem : addFoodItem}
               color="#007bff"
             />
@@ -309,18 +318,18 @@ export default function PantryScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     flex: 1,
   },
   title: {
     marginBottom: 16,
     fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
+    fontWeight: "bold",
+    textAlign: "center",
+    color: "#333",
   },
   input: {
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderWidth: 1,
     padding: 8,
     marginBottom: 16,
@@ -334,45 +343,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 8,
     marginBottom: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 8,
     elevation: 1,
   },
   itemText: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
     flex: 1,
     marginRight: 8,
   },
   buttonContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContainer: {
-    width: '80%',
-    backgroundColor: '#ffffff',
+    width: "80%",
+    backgroundColor: "#ffffff",
     borderRadius: 8,
     padding: 20,
     elevation: 5,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
-    color: '#333',
+    color: "#333",
   },
   modalInput: {
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderWidth: 1,
     padding: 10,
     marginBottom: 10,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   FlatList,
@@ -6,9 +6,14 @@ import {
   Button,
   TouchableOpacity,
   DeviceEventEmitter,
-} from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+} from "react-native";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import {
+  useNavigation,
+  NavigationProp,
+  ParamListBase,
+} from "@react-navigation/native";
 
 interface FoodItem {
   id: number;
@@ -25,17 +30,20 @@ declare global {
   var foodItems: FoodItem[];
 }
 
-export default function CreateScreen({ navigation }: any) {
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(global.foodItems || []);
+const CreateScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const [foodItems, setFoodItems] = useState<FoodItem[]>(
+    global.foodItems || []
+  );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   useEffect(() => {
     // Subscribe to the event
     const subscription = DeviceEventEmitter.addListener(
-      'foodItemsUpdated',
+      "foodItemsUpdated",
       (updatedFoodItems: FoodItem[]) => {
         setFoodItems(updatedFoodItems);
-      },
+      }
     );
 
     // Initial load
@@ -49,9 +57,9 @@ export default function CreateScreen({ navigation }: any) {
 
   const toggleSelectItem = (id: number) => {
     if (selectedItems.includes(id)) {
-      setSelectedItems(prev => prev.filter(itemId => itemId !== id));
+      setSelectedItems((prev) => prev.filter((itemId) => itemId !== id));
     } else {
-      setSelectedItems(prev => [...prev, id]);
+      setSelectedItems((prev) => [...prev, id]);
     }
   };
 
@@ -61,9 +69,9 @@ export default function CreateScreen({ navigation }: any) {
       <TouchableOpacity onPress={() => toggleSelectItem(item.id)}>
         <View style={[styles.itemContainer, isSelected && styles.selectedItem]}>
           <ThemedText style={styles.itemText}>
-            {item.name} (x{item.totalQuantity}, {item.weightPerItem}{' '}
-            {item.unit} each) - {item.type}{' '}
-            {item.expirationDate ? `- Exp: ${item.expirationDate}` : ''}
+            {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit}{" "}
+            each) - {item.type}{" "}
+            {item.expirationDate ? `- Exp: ${item.expirationDate}` : ""}
           </ThemedText>
         </View>
       </TouchableOpacity>
@@ -77,7 +85,7 @@ export default function CreateScreen({ navigation }: any) {
       </ThemedText>
       <FlatList
         data={foodItems}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         style={styles.list}
       />
@@ -90,25 +98,25 @@ export default function CreateScreen({ navigation }: any) {
       />
       <Button
         title="Back to Pantry"
-        onPress={() => navigation.navigate('Pantry')}
+        onPress={() => navigation.navigate("PantryScreen")}
         color="#007bff"
       />
     </ThemedView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     flex: 1,
   },
   title: {
     marginBottom: 16,
     fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
+    fontWeight: "bold",
+    textAlign: "center",
+    color: "#333",
   },
   list: {
     marginTop: 10,
@@ -117,15 +125,17 @@ const styles = StyleSheet.create({
   itemContainer: {
     padding: 8,
     marginBottom: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 8,
     elevation: 1,
   },
   selectedItem: {
-    backgroundColor: '#cce5ff',
+    backgroundColor: "#cce5ff",
   },
   itemText: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
 });
+
+export default CreateScreen;

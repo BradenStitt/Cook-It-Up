@@ -7,9 +7,16 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { supabase } from "../lib/supabase"; // Adjust the path as needed
+import { supabase } from "../lib/supabase";
+import {
+  useNavigation,
+  NavigationProp,
+  ParamListBase,
+} from "@react-navigation/native";
 
 const RegisterPage: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -31,6 +38,7 @@ const RegisterPage: React.FC = () => {
       }
 
       Alert.alert("Success", "User registered successfully!");
+      navigation.navigate("CreateScreen");
     } catch (error) {
       Alert.alert("Error", (error as any).message);
     }

@@ -40,23 +40,29 @@ const LandingPage: React.FC = () => {
   };
 
   const handleLogin = async () => {
-    if (!email || !password || !name) {
+    if (!email || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
-      // Insert user into the Supabase table
+      // Check if the email and password match
       const { data, error } = await supabase
         .from("User")
-        .insert([{ email, name, password }]);
+        .select("*")
+        .eq("email", email)
+        .eq("password", password);
 
       if (error) {
         throw error;
       }
 
-      Alert.alert("Success", "User created successfully!");
-      fetchUsers(); // Refresh the user list
+      if (data.length > 0) {
+        Alert.alert("Success", "Login successful!");
+        navigation.navigate("CreateScreen"); // Navigate to CreateScreen
+      } else {
+        Alert.alert("Error", "Invalid email or password");
+      }
     } catch (error) {
       Alert.alert("Error", (error as any).message);
     }
@@ -68,13 +74,6 @@ const LandingPage: React.FC = () => {
       <Text style={styles.header}>Cook It Up!</Text>
 
       <View style={styles.box}>
-        {/* Name Input */}
-        <TextInput
-          placeholder="Name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
         {/* Email Input */}
         <TextInput
           placeholder="Email"
