@@ -15,17 +15,13 @@ import {
   useNavigation,
   NavigationProp,
   ParamListBase,
-  RouteProp,
-  useRoute,
 } from "@react-navigation/native";
 import OpenAI from "openai";
-import { supabase } from "@/lib/supabase";
 
 interface FoodItem {
   id: number;
   name: string;
   quantity: number;
-  user: string;
 }
 
 interface Recipe {
@@ -41,74 +37,52 @@ interface Recipe {
   difficulty: string;
 }
 
-type RootStackParamList = {
-  CreateScreen: { userId: number };
-};
-type CreateScreenRouteProp = RouteProp<RootStackParamList, "CreateScreen">;
+declare global {
+  var foodItems: FoodItem[];
+}
 
 const CreateScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
-  const route = useRoute<CreateScreenRouteProp>();
-  const userId = route.params?.userId;
-
-  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [foodItems, setFoodItems] = useState<FoodItem[]>(
+    global.foodItems || []
+  );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
+  // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
     dangerouslyAllowBrowser: true,
   });
 
-  const fetchFoodItems = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Food")
-        .select("*")
-        .eq("User", userId);
-
-      if (error) throw error;
-
-      if (data) {
-        setFoodItems(data);
-      }
-    } catch (err) {}
-  };
-
   useEffect(() => {
-    fetchFoodItems();
-
     const subscription = DeviceEventEmitter.addListener(
       "foodItemsUpdated",
-      fetchFoodItems
+      (updatedFoodItems: FoodItem[]) => {
+        setFoodItems(updatedFoodItems);
+      }
     );
+
+    setFoodItems(global.foodItems || []);
 
     return () => {
       subscription.remove();
     };
-  }, [userId, foodItems]);
+  }, []);
 
-  const getRecipeRecommendations = async (
-    ingredients: { name: string; quantity: number }[]
-  ) => {
+  const getRecipeRecommendations = async (ingredients: string[]) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      const ingredientsList = ingredients
-        .map((ing) => `${ing.name} (${ing.quantity} available)`)
-        .join(", ");
 
       const response = await openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
         messages: [
           {
             role: "system",
-            content: `You are a creative chef that provides detailed recipe recommendations based on available ingredients and their quantities. 
-            Consider the available quantities when suggesting recipes and try to maximize the use of available ingredients.
-            Each recipe should be practical and feasible with the given quantities.
+            content: `You are a creative chef that provides detailed recipe recommendations based on available ingredients. 
             Provide your response as a JSON object with the following structure:
             {
               "recipes": [
@@ -132,7 +106,9 @@ const CreateScreen: React.FC = () => {
           },
           {
             role: "user",
-            content: `Based on these available ingredients and their quantities: ${ingredientsList}, generate 3 possible recipes in JSON format. Make sure the recipes respect the available quantities of ingredients.`,
+            content: `Based on these available ingredients: ${ingredients.join(
+              ", "
+            )}, generate 3 possible recipes in JSON format.`,
           },
         ],
         response_format: { type: "json_object" },
@@ -145,6 +121,7 @@ const CreateScreen: React.FC = () => {
       }
 
       const parsedResponse = JSON.parse(content);
+      console.log(parsedResponse);
 
       if (!isValidRecipeResponse(parsedResponse)) {
         throw new Error("Invalid response format from API");
@@ -152,6 +129,10 @@ const CreateScreen: React.FC = () => {
 
       setRecipes(parsedResponse.recipes);
     } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to generate recipes";
+      setError(errorMessage);
+      Alert.alert("Error", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -177,15 +158,18 @@ const CreateScreen: React.FC = () => {
   };
 
   const handleGenerateRecipes = async () => {
-    const selectedIngredients = foodItems.map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-    }));
+    if (selectedItems.length === -1) {
+      Alert.alert("Error", "Please select at least one ingredient");
+      return;
+    }
+
+    const selectedIngredients = foodItems
+      .filter((item) => selectedItems.includes(item.id))
+      .map((item) => item.name);
 
     await getRecipeRecommendations(selectedIngredients);
   };
 
-  // Rest of the component remains the same...
   const toggleSelectItem = (id: number) => {
     if (selectedItems.includes(id)) {
       setSelectedItems((prev) => prev.filter((itemId) => itemId !== id));
@@ -286,7 +270,7 @@ const CreateScreen: React.FC = () => {
 
       <Button
         title="Back to Pantry"
-        onPress={() => navigation.navigate("PantryScreen", { userId: userId })}
+        onPress={() => navigation.navigate("PantryScreen")}
         color="#007bff"
       />
     </ThemedView>
@@ -294,7 +278,6 @@ const CreateScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  // Styles remain the same...
   container: {
     padding: 16,
     backgroundColor: "#f8f9fa",
