@@ -8,101 +8,112 @@ import {
   Modal,
   Alert,
   DeviceEventEmitter,
-  ScrollView,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import {
-  NavigationProp,
-  ParamListBase,
-  useNavigation,
-} from "@react-navigation/native";
+import { supabase } from "../lib/supabase"; // Adjust the path as needed
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 
 interface FoodItem {
   id: number;
   name: string;
-  totalQuantity: number;
-  weightPerItem: number;
-  unit: string;
-  type: string;
-  expirationDate?: string; // Optional expiration date
+  quantity: number;
+  User: number;
 }
-
-// Extend the global object to include foodItems
-declare global {
-  var foodItems: FoodItem[];
-}
-
-// Declare foodTypes and units before using them
-const foodTypes = ["Dairy", "Fruits", "Vegetables", "Protein", "Grains"];
-const units = ["oz", "g", "lbs", "kg"];
 
 export default function PantryScreen() {
-  const navigation = useNavigation<NavigationProp<ParamListBase>>();
-
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(
-    global.foodItems || []
-  );
+  const navigation = useNavigation();
+  const route = useRoute<RouteProp<{ params: { userId: number } }, "params">>();
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<string>("All");
   const [modalVisible, setModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<number | null>(null);
   const [newItem, setNewItem] = useState<string>("");
-  const [totalQuantity, setTotalQuantity] = useState<number | "">("");
-  const [weightPerItem, setWeightPerItem] = useState<number | "">("");
-  const [selectedUnit, setSelectedUnit] = useState<string>(units[0]);
-  const [foodType, setFoodType] = useState<string>(foodTypes[0]);
-  const [addExpiration, setAddExpiration] = useState<boolean>(false);
-  const [expirationDate, setExpirationDate] = useState<string>("");
+  const [quantity, setQuantity] = useState<number | "">("");
+
+  // Get userId from route params
+  const userId = route.params?.userId;
 
   useEffect(() => {
-    // Update global foodItems and emit event whenever foodItems change
-    global.foodItems = foodItems;
-    DeviceEventEmitter.emit("foodItemsUpdated", foodItems);
-  }, [foodItems]);
+    if (!userId) {
+      Alert.alert("Error", "User ID not found");
+      navigation.goBack();
+      return;
+    }
 
-  const addFoodItem = () => {
-    if (newItem.trim() && totalQuantity !== "" && weightPerItem !== "") {
+    // Load user's food items
+    loadUserFoodItems();
+  }, [userId]);
+
+  const loadUserFoodItems = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Food")
+        .select("*")
+        .eq("User", userId);
+
+      if (error) {
+        throw error;
+      }
+
+      setFoodItems(data);
+
+    } catch (error) {
+      Alert.alert("Error", "Failed to load food items.");
+    }
+  };
+
+  const addFoodItem = async () => {
+    if (!userId) {
+      Alert.alert("Error", "User ID not found");
+      return;
+    }
+
+    if (newItem.trim() && quantity !== "") {
       const itemData: FoodItem = {
-        id: Date.now(), // Use timestamp for unique ID
+        id: Date.now(),
         name: newItem.trim(),
-        totalQuantity: Number(totalQuantity),
-        weightPerItem: Number(weightPerItem),
-        unit: selectedUnit,
-        type: foodType,
-        ...(addExpiration ? { expirationDate } : {}),
+        quantity: Number(quantity),
+        User: userId,
       };
-      setFoodItems([...foodItems, itemData]);
-      resetInputs();
-      setModalVisible(false);
+
+      try {
+        const { data, error } = await supabase.from("Food").insert([itemData]);
+
+        setFoodItems([...foodItems, itemData]);
+        resetInputs();
+        setModalVisible(false);
+      } catch (error) {}
     } else {
       Alert.alert("Error", "Please fill in all fields.");
     }
   };
 
-  const editFoodItem = () => {
-    if (
-      currentItemId !== null &&
-      newItem.trim() &&
-      totalQuantity !== "" &&
-      weightPerItem !== ""
-    ) {
+  const editFoodItem = async () => {
+    if (currentItemId !== null && newItem.trim() && quantity !== "") {
       const updatedItems = foodItems.map((item) => {
         if (item.id === currentItemId) {
           return {
             ...item,
             name: newItem.trim(),
-            totalQuantity: Number(totalQuantity),
-            weightPerItem: Number(weightPerItem),
-            unit: selectedUnit,
-            type: foodType,
-            ...(addExpiration ? { expirationDate } : {}),
+            quantity: Number(quantity),
           };
         }
         return item;
       });
+
+      // Update the item in the database
+      const { data, error } = await supabase
+        .from("Food")
+        .update({ name: newItem.trim(), quantity: Number(quantity) })
+        .eq("id", currentItemId);
+
+      if (error) {
+        Alert.alert("Error", "Failed to update food item.");
+        return;
+      }
+
       setFoodItems(updatedItems);
       resetInputs();
       setModalVisible(false);
@@ -113,12 +124,7 @@ export default function PantryScreen() {
 
   const resetInputs = () => {
     setNewItem("");
-    setTotalQuantity("");
-    setWeightPerItem("");
-    setSelectedUnit(units[0]);
-    setFoodType(foodTypes[0]);
-    setAddExpiration(false);
-    setExpirationDate("");
+    setQuantity("");
     setCurrentItemId(null);
     setIsEditing(false);
   };
@@ -130,197 +136,123 @@ export default function PantryScreen() {
     ]);
   };
 
-  const deleteItem = (id: number) => {
+  const deleteItem = async (id: number) => {
+    // Delete the item from the database
+    const { data, error } = await supabase.from("Food").delete().eq("id", id);
+
+    if (error) {
+      Alert.alert("Error", "Failed to delete food item.");
+      return;
+    }
+
     setFoodItems((prevItems) => prevItems.filter((item) => item.id !== id));
   };
 
-  const renderItem = ({ item }: { item: FoodItem }) => {
-    return (
-      <View style={styles.itemContainer}>
-        <ThemedText style={styles.itemText}>
-          {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit}{" "}
-          each) - {item.type}{" "}
-          {item.expirationDate ? `- Exp: ${item.expirationDate}` : ""}
-        </ThemedText>
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Edit"
-            onPress={() => openEditModal(item)}
-            color="#007bff"
-          />
-          <Button
-            title="Remove"
-            onPress={() => confirmDelete(item.id)}
-            color="red"
-          />
-        </View>
+  const renderItem = ({ item }: { item: FoodItem }) => (
+    <View style={styles.itemContainer}>
+      <ThemedText style={styles.itemText}>
+        {item.name} (x{item.quantity})
+      </ThemedText>
+      <View style={styles.buttonContainer}>
+        <Button
+          title="Edit"
+          onPress={() => openEditModal(item)}
+          color="#007bff"
+        />
+        <Button
+          title="Remove"
+          onPress={() => confirmDelete(item.id)}
+          color="red"
+        />
       </View>
-    );
-  };
+    </View>
+  );
 
-  const openEditModal = (item: FoodItem) => {
+  const openEditModal = async (item: FoodItem) => {
     setNewItem(item.name);
-    setTotalQuantity(item.totalQuantity);
-    setWeightPerItem(item.weightPerItem);
-    setSelectedUnit(item.unit);
-    setFoodType(item.type);
-    setExpirationDate(item.expirationDate || "");
-    setAddExpiration(!!item.expirationDate);
+    setQuantity(item.quantity);
     setCurrentItemId(item.id);
     setIsEditing(true);
     setModalVisible(true);
+
+    // update the item in the database
+    const { data, error } = await supabase
+      .from("Food")
+      .update({ name: item.name, quantity: item.quantity });
   };
 
-  const handleTotalQuantityChange = (text: string) => {
+  const handleQuantityChange = (text: string) => {
     if (text === "") {
-      setTotalQuantity("");
+      setQuantity("");
     } else {
       const numericValue = parseFloat(text);
-      setTotalQuantity(isNaN(numericValue) ? "" : numericValue);
-    }
-  };
-
-  const handleWeightPerItemChange = (text: string) => {
-    if (text === "") {
-      setWeightPerItem("");
-    } else {
-      const numericValue = parseFloat(text);
-      setWeightPerItem(isNaN(numericValue) ? "" : numericValue);
+      setQuantity(isNaN(numericValue) ? "" : numericValue);
     }
   };
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.content}>
-        <ThemedText type="title" style={styles.title}>
-          Pantry
-        </ThemedText>
-        <TextInput
-          style={styles.input}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          placeholder="Search items"
-        />
-        <Picker
-          selectedValue={selectedType}
-          style={styles.picker}
-          onValueChange={(itemValue: string) => setSelectedType(itemValue)}
-        >
-          <Picker.Item label="All" value="All" />
-          {foodTypes.map((type) => (
-            <Picker.Item key={type} label={type} value={type} />
-          ))}
-        </Picker>
-        <FlatList
-          data={foodItems.filter(
-            (item) =>
-              item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-              (selectedType === "All" || item.type === selectedType)
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          style={styles.list}
-        />
-      </View>
-      <View style={styles.footer}>
-        <Button
-          title="Add Item"
-          onPress={() => {
-            setModalVisible(true);
-            setIsEditing(false);
-          }}
-          color="#28a745"
-        />
-        <Button
-          title="Go to Create"
-          onPress={() => navigation.navigate("CreateScreen")}
-          color="#007bff"
-        />
-      </View>
+      <ThemedText type="title" style={styles.title}>
+        My Food Items
+      </ThemedText>
+
+      <TextInput
+        style={styles.input}
+        value={searchTerm}
+        onChangeText={setSearchTerm}
+        placeholder="Search items"
+      />
+
+      <FlatList
+        data={foodItems.filter((item) =>
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        style={styles.list}
+      />
+
+      <Button
+        title="Add Item"
+        onPress={() => {
+          setModalVisible(true);
+          setIsEditing(false);
+        }}
+        color="#28a745"
+      />
+
       <Modal transparent={true} visible={modalVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <ScrollView contentContainerStyle={styles.modalContent}>
-              <ThemedText type="title" style={styles.modalTitle}>
-                {isEditing ? "Edit Item" : "Add Item"}
-              </ThemedText>
-              <TextInput
-                style={styles.modalInput}
-                value={newItem}
-                onChangeText={setNewItem}
-                placeholder="Food item name"
-              />
-              <Picker
-                selectedValue={foodType}
-                style={styles.modalPicker}
-                onValueChange={(itemValue: string) => setFoodType(itemValue)}
-              >
-                {foodTypes.map((type) => (
-                  <Picker.Item key={type} label={type} value={type} />
-                ))}
-              </Picker>
-              <TextInput
-                style={styles.modalInput}
-                value={totalQuantity === "" ? "" : String(totalQuantity)}
-                onChangeText={handleTotalQuantityChange}
-                placeholder="Total Quantity"
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={weightPerItem === "" ? "" : String(weightPerItem)}
-                onChangeText={handleWeightPerItemChange}
-                placeholder="Weight per Item"
-                keyboardType="numeric"
-              />
-              <Picker
-                selectedValue={selectedUnit}
-                style={styles.modalPicker}
-                onValueChange={(itemValue: string) =>
-                  setSelectedUnit(itemValue)
-                }
-              >
-                {units.map((unit) => (
-                  <Picker.Item key={unit} label={unit} value={unit} />
-                ))}
-              </Picker>
-              <ThemedText style={styles.modalText}>
-                Do you want to add an expiration date?
-              </ThemedText>
-              <Picker
-                selectedValue={addExpiration ? "Yes" : "No"}
-                style={styles.modalPicker}
-                onValueChange={(value: string) =>
-                  setAddExpiration(value === "Yes")
-                }
-              >
-                <Picker.Item label="Yes" value="Yes" />
-                <Picker.Item label="No" value="No" />
-              </Picker>
-              {addExpiration && (
-                <TextInput
-                  style={styles.modalInput}
-                  value={expirationDate}
-                  onChangeText={setExpirationDate}
-                  placeholder="Expiration Date (YYYY-MM-DD)"
-                />
-              )}
-              <View style={styles.modalButtonContainer}>
-                <Button
-                  title={isEditing ? "Update" : "Add"}
-                  onPress={isEditing ? editFoodItem : addFoodItem}
-                  color="#007bff"
-                />
-                <Button
-                  title="Cancel"
-                  onPress={() => {
-                    setModalVisible(false);
-                    resetInputs();
-                  }}
-                  color="gray"
-                />
-              </View>
-            </ScrollView>
+            <ThemedText type="title" style={styles.modalTitle}>
+              {isEditing ? "Edit Item" : "Add Item"}
+            </ThemedText>
+            <TextInput
+              style={styles.modalInput}
+              value={newItem}
+              onChangeText={setNewItem}
+              placeholder="Food item name"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={quantity === "" ? "" : String(quantity)}
+              onChangeText={handleQuantityChange}
+              placeholder="Quantity"
+              keyboardType="numeric"
+            />
+            <Button
+              title={isEditing ? "Update" : "Add"}
+              onPress={isEditing ? editFoodItem : addFoodItem}
+              color="#007bff"
+            />
+            <Button
+              title="Cancel"
+              onPress={() => {
+                setModalVisible(false);
+                resetInputs();
+              }}
+              color="gray"
+            />
           </View>
         </View>
       </Modal>
@@ -330,17 +262,9 @@ export default function PantryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, // Ensure the container takes up the full screen
     padding: 16,
     backgroundColor: "#f8f9fa",
-  },
-  content: {
-    flex: 1, // Allow content to expand and fill available space
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 10,
+    flex: 1,
   },
   title: {
     marginBottom: 16,
@@ -355,15 +279,10 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 16,
     borderRadius: 4,
-    backgroundColor: "#fff",
-  },
-  picker: {
-    marginBottom: 16,
-    backgroundColor: "#fff",
   },
   list: {
-    flex: 1, // Allow the list to expand and fill available space
     marginTop: 10,
+    flex: 1,
   },
   itemContainer: {
     flexDirection: "row",
@@ -391,23 +310,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContainer: {
-    width: "90%", // Increased width for better mobile view
+    width: "80%",
     backgroundColor: "#ffffff",
     borderRadius: 8,
     padding: 20,
     elevation: 5,
-    maxHeight: "80%", // Ensure the modal doesn't exceed screen height
-  },
-  modalContent: {
-    flexGrow: 1,
-    justifyContent: "center",
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 20,
     color: "#333",
-    textAlign: "center",
   },
   modalInput: {
     borderColor: "#ccc",
@@ -415,20 +328,5 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 4,
-    backgroundColor: "#fff",
-  },
-  modalPicker: {
-    marginBottom: 10,
-    backgroundColor: "#fff",
-  },
-  modalText: {
-    marginBottom: 10,
-    fontSize: 16,
-    color: "#333",
-  },
-  modalButtonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
   },
 });
