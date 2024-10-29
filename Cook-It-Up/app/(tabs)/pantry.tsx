@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -7,6 +7,7 @@ import {
   View,
   Modal,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { ThemedText } from '@/components/ThemedText';
@@ -22,11 +23,17 @@ interface FoodItem {
   expirationDate?: string; // Optional expiration date
 }
 
+// Extend the global object to include foodItems
+declare global {
+  var foodItems: FoodItem[];
+}
+
+// Declare foodTypes and units before using them
 const foodTypes = ['Dairy', 'Fruits', 'Vegetables', 'Protein', 'Grains'];
 const units = ['oz', 'g', 'lbs', 'kg'];
 
-export default function PantryScreen() {
-  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+export default function PantryScreen({ navigation }: any) {
+  const [foodItems, setFoodItems] = useState<FoodItem[]>(global.foodItems || []);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [modalVisible, setModalVisible] = useState(false);
@@ -40,10 +47,16 @@ export default function PantryScreen() {
   const [addExpiration, setAddExpiration] = useState<boolean>(false);
   const [expirationDate, setExpirationDate] = useState<string>('');
 
+  useEffect(() => {
+    // Update global foodItems and emit event whenever foodItems change
+    global.foodItems = foodItems;
+    DeviceEventEmitter.emit('foodItemsUpdated', foodItems);
+  }, [foodItems]);
+
   const addFoodItem = () => {
     if (newItem.trim() && totalQuantity !== '' && weightPerItem !== '') {
       const itemData: FoodItem = {
-        id: foodItems.length + 1,
+        id: Date.now(), // Use timestamp for unique ID
         name: newItem.trim(),
         totalQuantity: Number(totalQuantity),
         weightPerItem: Number(weightPerItem),
@@ -51,7 +64,7 @@ export default function PantryScreen() {
         type: foodType,
         ...(addExpiration ? { expirationDate } : {}),
       };
-      setFoodItems(prevItems => [...prevItems, itemData]);
+      setFoodItems([...foodItems, itemData]);
       resetInputs();
       setModalVisible(false);
     } else {
@@ -60,7 +73,12 @@ export default function PantryScreen() {
   };
 
   const editFoodItem = () => {
-    if (currentItemId !== null && newItem.trim() && totalQuantity !== '' && weightPerItem !== '') {
+    if (
+      currentItemId !== null &&
+      newItem.trim() &&
+      totalQuantity !== '' &&
+      weightPerItem !== ''
+    ) {
       const updatedItems = foodItems.map(item => {
         if (item.id === currentItemId) {
           return {
@@ -96,33 +114,35 @@ export default function PantryScreen() {
   };
 
   const confirmDelete = (id: number) => {
-    Alert.alert(
-      'Delete Item',
-      'Are you sure you want to delete this item?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'OK', onPress: () => deleteItem(id) },
-      ]
-    );
+    Alert.alert('Delete Item', 'Are you sure you want to delete this item?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'OK', onPress: () => deleteItem(id) },
+    ]);
   };
 
   const deleteItem = (id: number) => {
-    setFoodItems(prevItems => {
-      const newItems = prevItems.filter(item => item.id !== id);
-      console.log('Deleted item:', id); // Debugging line
-      return newItems;
-    });
+    setFoodItems(prevItems => prevItems.filter(item => item.id !== id));
   };
 
   const renderItem = ({ item }: { item: FoodItem }) => {
     return (
       <View style={styles.itemContainer}>
         <ThemedText style={styles.itemText}>
-          {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit} each) - {item.type} {item.expirationDate ? `- Exp: ${item.expirationDate}` : ''}
+          {item.name} (x{item.totalQuantity}, {item.weightPerItem} {item.unit}{' '}
+          each) - {item.type}{' '}
+          {item.expirationDate ? `- Exp: ${item.expirationDate}` : ''}
         </ThemedText>
         <View style={styles.buttonContainer}>
-          <Button title="Edit" onPress={() => openEditModal(item)} color="#007bff" />
-          <Button title="Remove" onPress={() => confirmDelete(item.id)} color="red" />
+          <Button
+            title="Edit"
+            onPress={() => openEditModal(item)}
+            color="#007bff"
+          />
+          <Button
+            title="Remove"
+            onPress={() => confirmDelete(item.id)}
+            color="red"
+          />
         </View>
       </View>
     );
@@ -130,8 +150,8 @@ export default function PantryScreen() {
 
   const openEditModal = (item: FoodItem) => {
     setNewItem(item.name);
-    setTotalQuantity(item.totalQuantity); 
-    setWeightPerItem(item.weightPerItem); 
+    setTotalQuantity(item.totalQuantity);
+    setWeightPerItem(item.weightPerItem);
     setSelectedUnit(item.unit);
     setFoodType(item.type);
     setExpirationDate(item.expirationDate || '');
@@ -161,7 +181,9 @@ export default function PantryScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>Pantry</ThemedText>
+      <ThemedText type="title" style={styles.title}>
+        Pantry
+      </ThemedText>
       <TextInput
         style={styles.input}
         value={searchTerm}
@@ -174,26 +196,39 @@ export default function PantryScreen() {
         onValueChange={(itemValue: string) => setSelectedType(itemValue)}
       >
         <Picker.Item label="All" value="All" />
-        {foodTypes.map((type) => (
+        {foodTypes.map(type => (
           <Picker.Item key={type} label={type} value={type} />
         ))}
       </Picker>
       <FlatList
-        data={foodItems.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-                     (selectedType === 'All' || item.type === selectedType))}
-        keyExtractor={(item) => item.id.toString()}
+        data={foodItems.filter(
+          item =>
+            item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            (selectedType === 'All' || item.type === selectedType),
+        )}
+        keyExtractor={item => item.id.toString()}
         renderItem={renderItem}
         style={styles.list}
       />
-      <Button title="Add Item" onPress={() => { setModalVisible(true); setIsEditing(false); }} color="#28a745" />
-      <Modal
-        transparent={true}
-        visible={modalVisible}
-        animationType="fade"
-      >
+      <Button
+        title="Add Item"
+        onPress={() => {
+          setModalVisible(true);
+          setIsEditing(false);
+        }}
+        color="#28a745"
+      />
+      <Button
+        title="Go to Create"
+        onPress={() => navigation.navigate('Create')}
+        color="#007bff"
+      />
+      <Modal transparent={true} visible={modalVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <ThemedText type="title" style={styles.modalTitle}>{isEditing ? 'Edit Item' : 'Add Item'}</ThemedText>
+            <ThemedText type="title" style={styles.modalTitle}>
+              {isEditing ? 'Edit Item' : 'Add Item'}
+            </ThemedText>
             <TextInput
               style={styles.modalInput}
               value={newItem}
@@ -205,7 +240,7 @@ export default function PantryScreen() {
               style={styles.modalPicker}
               onValueChange={(itemValue: string) => setFoodType(itemValue)}
             >
-              {foodTypes.map((type) => (
+              {foodTypes.map(type => (
                 <Picker.Item key={type} label={type} value={type} />
               ))}
             </Picker>
@@ -228,7 +263,7 @@ export default function PantryScreen() {
               style={styles.modalPicker}
               onValueChange={(itemValue: string) => setSelectedUnit(itemValue)}
             >
-              {units.map((unit) => (
+              {units.map(unit => (
                 <Picker.Item key={unit} label={unit} value={unit} />
               ))}
             </Picker>
@@ -236,7 +271,9 @@ export default function PantryScreen() {
             <Picker
               selectedValue={addExpiration ? 'Yes' : 'No'}
               style={styles.modalPicker}
-              onValueChange={(value: string) => setAddExpiration(value === 'Yes')}
+              onValueChange={(value: string) =>
+                setAddExpiration(value === 'Yes')
+              }
             >
               <Picker.Item label="Yes" value="Yes" />
               <Picker.Item label="No" value="No" />
@@ -249,8 +286,19 @@ export default function PantryScreen() {
                 placeholder="Expiration Date (YYYY-MM-DD)"
               />
             )}
-            <Button title={isEditing ? "Update" : "Add"} onPress={isEditing ? editFoodItem : addFoodItem} color="#007bff" />
-            <Button title="Cancel" onPress={() => setModalVisible(false)} color="gray" />
+            <Button
+              title={isEditing ? 'Update' : 'Add'}
+              onPress={isEditing ? editFoodItem : addFoodItem}
+              color="#007bff"
+            />
+            <Button
+              title="Cancel"
+              onPress={() => {
+                setModalVisible(false);
+                resetInputs();
+              }}
+              color="gray"
+            />
           </View>
         </View>
       </Modal>
@@ -283,6 +331,7 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: 10,
+    flex: 1,
   },
   itemContainer: {
     flexDirection: 'row',
@@ -297,6 +346,8 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: 16,
     color: '#333',
+    flex: 1,
+    marginRight: 8,
   },
   buttonContainer: {
     flexDirection: 'row',
